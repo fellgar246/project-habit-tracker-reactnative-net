@@ -1,5 +1,7 @@
 import { getApiUrl } from './config';
 import { ApiError, parseProblemDetails, problemToApiError } from './errors';
+import * as tokenStorage from '../features/auth/tokenStorage';
+import { AuthResponse } from '../types/api';
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -7,22 +9,41 @@ type AuthTokenProvider = () => Promise<string | null> | string | null;
 
 let authTokenProvider: AuthTokenProvider | null = null;
 
-/** Extension point for PLAN-04: inject JWT from secure storage. */
+/** Inject JWT from secure storage / in-memory session. */
 export function setAuthTokenProvider(provider: AuthTokenProvider | null): void {
   authTokenProvider = provider;
+}
+
+type SessionExpiredHandler = () => void;
+type TokensRefreshedHandler = (response: AuthResponse) => void;
+
+let onSessionExpired: SessionExpiredHandler | null = null;
+let onTokensRefreshed: TokensRefreshedHandler | null = null;
+
+export function setOnSessionExpired(handler: SessionExpiredHandler | null): void {
+  onSessionExpired = handler;
+}
+
+export function setOnTokensRefreshed(handler: TokensRefreshedHandler | null): void {
+  onTokensRefreshed = handler;
 }
 
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: unknown;
   timeoutMs?: number;
+  /** Skip automatic refresh retry (used internally for /auth/refresh). */
+  skipAuthRefresh?: boolean;
 };
 
-async function resolveAuthHeader(): Promise<Record<string, string>> {
-  if (!authTokenProvider) {
-    return {};
-  }
+let refreshPromise: Promise<string | null> | null = null;
 
-  const token = await authTokenProvider();
+function isAuthEndpoint(path: string): boolean {
+  return path.startsWith('/auth/');
+}
+
+async function resolveAuthHeader(): Promise<Record<string, string>> {
+  const provider = authTokenProvider ?? (() => tokenStorage.getAccessToken());
+  const token = await provider();
   if (!token) {
     return {};
   }
@@ -36,7 +57,52 @@ function buildUrl(path: string): string {
   return `${base}${normalizedPath}`;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = performRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+
+  return refreshPromise;
+}
+
+async function performRefresh(): Promise<string | null> {
+  const stored = await tokenStorage.load();
+  if (!stored?.refreshToken) {
+    await clearSession();
+    return null;
+  }
+
+  try {
+    const { data: response } = await rawRequest<AuthResponse>('/auth/refresh', {
+      method: 'POST',
+      body: { refreshToken: stored.refreshToken },
+    });
+
+    await tokenStorage.save({
+      accessToken: response.accessToken,
+      refreshToken: response.refreshToken,
+      user: response.user,
+    });
+
+    onTokensRefreshed?.(response);
+    return response.accessToken;
+  } catch {
+    await clearSession();
+    return null;
+  }
+}
+
+async function clearSession(): Promise<void> {
+  await tokenStorage.clear();
+  onSessionExpired?.();
+}
+
+async function rawRequest<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<{ data: T; response: Response }> {
   const { body, timeoutMs = REQUEST_TIMEOUT_MS, headers, ...rest } = options;
 
   const controller = new AbortController();
@@ -60,15 +126,15 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
 
     if (response.ok) {
       if (response.status === 204) {
-        return undefined as T;
+        return { data: undefined as T, response };
       }
 
       const contentType = response.headers.get('content-type') ?? '';
       if (contentType.includes('application/json')) {
-        return (await response.json()) as T;
+        return { data: (await response.json()) as T, response };
       }
 
-      return undefined as T;
+      return { data: undefined as T, response };
     }
 
     const problem = await parseProblemDetails(response);
@@ -93,6 +159,34 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     });
   } finally {
     clearTimeout(timeoutId);
+  }
+}
+
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+  isRetry = false,
+): Promise<T> {
+  const { skipAuthRefresh = false, ...requestOptions } = options;
+
+  try {
+    const { data } = await rawRequest<T>(path, requestOptions);
+    return data;
+  } catch (error) {
+    if (
+      !isRetry &&
+      !skipAuthRefresh &&
+      error instanceof ApiError &&
+      error.status === 401 &&
+      !isAuthEndpoint(path)
+    ) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        return request<T>(path, options, true);
+      }
+    }
+
+    throw error;
   }
 }
 

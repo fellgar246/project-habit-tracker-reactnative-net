@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text } from 'react-native';
+import { Alert, Text } from 'react-native';
 
 import { checkHealth } from '../../../api/endpoints/health';
 import { getApiUrl, getHealthUrl } from '../../../api/config';
@@ -11,8 +11,9 @@ import { HealthResponse } from '../../../types/api';
 
 export function ProfileScreen() {
   const { colors, spacing, typography } = useTheme();
-  const { setIsAuthenticated } = useAuth();
+  const { user, logout } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [health, setHealth] = useState<HealthResponse | null>(null);
 
@@ -36,9 +37,40 @@ export function ProfileScreen() {
     }
   }
 
+  function handleLogoutPress() {
+    Alert.alert('Cerrar sesión', '¿Seguro que quieres salir de tu cuenta?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Cerrar sesión',
+        style: 'destructive',
+        onPress: async () => {
+          setLogoutLoading(true);
+          try {
+            await logout();
+          } finally {
+            setLogoutLoading(false);
+          }
+        },
+      },
+    ]);
+  }
+
   return (
     <Screen scroll>
       <Text style={[typography.title, { marginBottom: spacing.lg }]}>Perfil</Text>
+
+      <Card style={{ marginBottom: spacing.lg }}>
+        <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.xs }]}>
+          Nombre
+        </Text>
+        <Text style={[typography.subtitle, { marginBottom: spacing.md }]}>
+          {user?.displayName ?? '—'}
+        </Text>
+        <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.xs }]}>
+          Correo
+        </Text>
+        <Text style={typography.body}>{user?.email ?? '—'}</Text>
+      </Card>
 
       <Card style={{ marginBottom: spacing.lg }}>
         <Text style={[typography.subtitle, { marginBottom: spacing.sm }]}>
@@ -77,9 +109,11 @@ export function ProfileScreen() {
       </Card>
 
       <Button
-        title="Cerrar sesión (mock)"
+        title="Cerrar sesión"
         variant="secondary"
-        onPress={() => setIsAuthenticated(false)}
+        loading={logoutLoading}
+        disabled={logoutLoading}
+        onPress={handleLogoutPress}
       />
     </Screen>
   );

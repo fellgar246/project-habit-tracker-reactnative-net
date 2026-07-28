@@ -10,3 +10,16 @@ export type HealthResponse = {
   status: string;
   database: string;
 };
+
+export type User = {
+  id: string;
+  email: string;
+  displayName: string;
+};
+
+export type AuthResponse = {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: string;
+};

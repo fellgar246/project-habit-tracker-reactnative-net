@@ -3,6 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 
 import { useAuth } from '../features/auth/AuthContext';
+import { SplashScreen } from '../features/auth/screens/SplashScreen';
 import { useTheme } from '../theme';
 import { AppTabs } from './AppTabs';
 import { AuthStack } from './AuthStack';
@@ -11,7 +12,7 @@ import { RootStackParamList } from './types';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const { colors, colorScheme } = useTheme();
 
   const navTheme: NavTheme = {
@@ -31,6 +32,15 @@ export function RootNavigator() {
       heavy: { fontFamily: 'System', fontWeight: '800' },
     },
   };
+
+  if (isLoading) {
+    return (
+      <>
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <SplashScreen />
+      </>
+    );
+  }
 
   return (
     <NavigationContainer theme={navTheme}>
