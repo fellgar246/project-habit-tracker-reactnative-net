@@ -28,6 +28,11 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__Default: Host=db;Port=5432;Database=habittracker;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      Jwt__Issuer: ${JWT__Issuer:-HabitTracker}
+      Jwt__Audience: ${JWT__Audience:-HabitTracker}
+      Jwt__Key: ${JWT__Key}
+      Jwt__AccessTokenMinutes: ${JWT__AccessTokenMinutes:-15}
+      Jwt__RefreshTokenDays: ${JWT__RefreshTokenDays:-7}
 
 volumes:
   pgdata:
