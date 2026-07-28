@@ -1,6 +1,8 @@
 using HabitTracker.Application.Auth.Interfaces;
+using HabitTracker.Application.Habits.Interfaces;
 using HabitTracker.Infrastructure.Auth;
 using HabitTracker.Infrastructure.Data;
+using HabitTracker.Infrastructure.Habits;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IHabitRepository, HabitRepository>();
 
         return services;
     }

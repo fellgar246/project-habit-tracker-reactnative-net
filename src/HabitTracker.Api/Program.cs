@@ -121,4 +121,7 @@ apiV1.MapGroup("/auth")
 
 apiV1.MapMeEndpoints();
 
+apiV1.MapGroup("/habits")
+    .MapHabitsEndpoints();
+
 app.Run();
