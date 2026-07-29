@@ -1,3 +1,5 @@
+using FluentValidation;
+using FluentValidation.Results;
 using HabitTracker.Application.Exceptions;
 using HabitTracker.Application.Habits.DTOs;
 using HabitTracker.Application.Habits.Interfaces;
@@ -12,7 +14,10 @@ public class HabitService(IHabitRepository habitRepository)
     private const int MaxActiveHabits = 50;
     private const string HabitNotFoundMessage = "Habit not found.";
     private const string ArchivedHabitMessage = "Cannot edit an archived habit. Unarchive it first.";
+    private const string ArchivedCheckInMessage = "Cannot check in to an archived habit.";
     private const string ActiveHabitLimitMessage = "You have reached the maximum of 50 active habits.";
+    private const string DuplicateCheckInMessage = "A check-in already exists for this date.";
+    private const string CheckInNotFoundMessage = "Check-in not found.";
 
     public async Task<IReadOnlyList<HabitDto>> ListAsync(
         Guid userId,
@@ -137,6 +142,106 @@ public class HabitService(IHabitRepository habitRepository)
 
             habit.IsArchived = false;
             await habitRepository.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<CheckInResponse> CheckInAsync(
+        Guid userId,
+        Guid habitId,
+        DateOnly date,
+        CancellationToken cancellationToken = default)
+    {
+        var habit = await habitRepository.GetByIdForUserTrackedAsync(habitId, userId, cancellationToken);
+
+        if (habit is null)
+            throw new NotFoundException(HabitNotFoundMessage);
+
+        if (habit.IsArchived)
+            throw new ConflictException(ArchivedCheckInMessage);
+
+        ValidateCheckInDate(date, habit);
+
+        var existing = await habitRepository.GetLogAsync(habitId, date, cancellationToken);
+        if (existing is not null)
+            throw new ConflictException(DuplicateCheckInMessage);
+
+        var log = new HabitLog
+        {
+            Id = Guid.NewGuid(),
+            HabitId = habitId,
+            Date = date,
+            CompletedAt = DateTime.UtcNow
+        };
+
+        await habitRepository.AddLogAndSaveAsync(log, cancellationToken);
+
+        var streaks = await CalculateStreaksAsync(habit, date, cancellationToken);
+
+        return new CheckInResponse(date.ToString("yyyy-MM-dd"), streaks.CurrentStreak, streaks.BestStreak);
+    }
+
+    public async Task<UndoCheckInResponse> UndoCheckInAsync(
+        Guid userId,
+        Guid habitId,
+        DateOnly date,
+        CancellationToken cancellationToken = default)
+    {
+        var habit = await habitRepository.GetByIdForUserAsync(habitId, userId, cancellationToken);
+
+        if (habit is null)
+            throw new NotFoundException(HabitNotFoundMessage);
+
+        var log = await habitRepository.GetLogAsync(habitId, date, cancellationToken);
+
+        if (log is null)
+            throw new NotFoundException(CheckInNotFoundMessage);
+
+        await habitRepository.RemoveLogAndSaveAsync(log, cancellationToken);
+
+        var streaks = await CalculateStreaksAsync(habit, date, cancellationToken);
+
+        return new UndoCheckInResponse(streaks.CurrentStreak, streaks.BestStreak);
+    }
+
+    private async Task<StreakResult> CalculateStreaksAsync(
+        Habit habit,
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+        var rows = await habitRepository.GetCompletedDatesByHabitIdsAsync([habit.Id], cancellationToken);
+        var completedDates = rows.Select(row => row.Date).ToHashSet();
+
+        if (completedDates.Count == 0)
+            return new StreakResult(0, 0);
+
+        var habitStartDate = DateOnly.FromDateTime(habit.CreatedAt);
+
+        return StreakCalculator.Calculate(
+            habit.ScheduleType,
+            habit.ScheduleDays,
+            habitStartDate,
+            completedDates,
+            today);
+    }
+
+    private static void ValidateCheckInDate(DateOnly date, Habit habit)
+    {
+        var serverToday = DateOnly.FromDateTime(DateTime.UtcNow);
+        var habitStartDate = DateOnly.FromDateTime(habit.CreatedAt);
+
+        if (date < habitStartDate)
+        {
+            throw new ValidationException([
+                new ValidationFailure("Date", "Check-in date cannot be before the habit was created.")
+            ]);
+        }
+
+        var dayDifference = Math.Abs(date.DayNumber - serverToday.DayNumber);
+        if (dayDifference > 1)
+        {
+            throw new ValidationException([
+                new ValidationFailure("Date", "Check-in date must be within one day of the server date.")
+            ]);
         }
     }
 

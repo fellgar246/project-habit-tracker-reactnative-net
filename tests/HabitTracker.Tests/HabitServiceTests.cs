@@ -11,6 +11,7 @@ using HabitTracker.Domain.Enums;
 using HabitTracker.Infrastructure.Auth;
 using HabitTracker.Infrastructure.Data;
 using HabitTracker.Infrastructure.Habits;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -163,6 +164,124 @@ public class HabitServiceTests : IDisposable
         Assert.True(read.CompletedToday);
         Assert.Equal(1, run.CurrentStreak);
         Assert.False(run.CompletedToday);
+    }
+
+    [Fact]
+    public async Task CheckInAsync_DuplicateCheckIn_ThrowsConflictException()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habit = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await _habitService.CheckInAsync(userId, habit.Id, today);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            _habitService.CheckInAsync(userId, habit.Id, today));
+
+        var logCount = await _db.HabitLogs.CountAsync(l => l.HabitId == habit.Id);
+        Assert.Equal(1, logCount);
+    }
+
+    [Fact]
+    public async Task CheckInAsync_OtherUsersHabit_ThrowsNotFoundException()
+    {
+        var userA = await RegisterUserAsync("user-a@example.com");
+        var userB = await RegisterUserAsync("user-b@example.com");
+        var habit = await _habitService.CreateAsync(userA, ValidCreateRequest("Read"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            _habitService.CheckInAsync(userB, habit.Id, today));
+    }
+
+    [Fact]
+    public async Task CheckInAsync_FutureDate_ThrowsValidationException()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habit = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var futureDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(2);
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _habitService.CheckInAsync(userId, habit.Id, futureDate));
+    }
+
+    [Fact]
+    public async Task CheckInAsync_DateBeforeCreation_ThrowsValidationException()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habit = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var trackedHabit = await _db.Habits.FindAsync(habit.Id);
+
+        trackedHabit!.CreatedAt = today.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            _habitService.CheckInAsync(userId, habit.Id, today.AddDays(-1)));
+    }
+
+    [Fact]
+    public async Task CheckInAsync_ArchivedHabit_ThrowsConflictException()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habit = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        await _habitService.ArchiveAsync(userId, habit.Id);
+
+        await Assert.ThrowsAsync<ConflictException>(() =>
+            _habitService.CheckInAsync(userId, habit.Id, today));
+    }
+
+    [Fact]
+    public async Task CheckInAsync_ReturnsUpdatedStreak()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habit = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var trackedHabit = await _db.Habits.FindAsync(habit.Id);
+
+        trackedHabit!.CreatedAt = today.AddDays(-5).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        _db.HabitLogs.Add(CreateLog(habit.Id, today.AddDays(-1)));
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        var response = await _habitService.CheckInAsync(userId, habit.Id, today);
+
+        Assert.Equal(today.ToString("yyyy-MM-dd"), response.Date);
+        Assert.Equal(2, response.CurrentStreak);
+        Assert.Equal(2, response.BestStreak);
+    }
+
+    [Fact]
+    public async Task UndoCheckInAsync_RemovesLogAndReturnsDecrementedStreak()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habit = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var trackedHabit = await _db.Habits.FindAsync(habit.Id);
+
+        trackedHabit!.CreatedAt = today.AddDays(-5).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        _db.HabitLogs.AddRange(
+            CreateLog(habit.Id, today.AddDays(-1)),
+            CreateLog(habit.Id, today));
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        var response = await _habitService.UndoCheckInAsync(userId, habit.Id, today);
+
+        Assert.Equal(1, response.CurrentStreak);
+        Assert.Equal(2, response.BestStreak);
+
+        var remainingLogs = await _db.HabitLogs.CountAsync(l => l.HabitId == habit.Id);
+        Assert.Equal(1, remainingLogs);
     }
 
     private static HabitLog CreateLog(Guid habitId, DateOnly date) =>

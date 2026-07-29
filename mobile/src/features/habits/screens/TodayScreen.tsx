@@ -17,7 +17,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { AppStackParamList, AppTabsParamList } from '../../../navigation/types';
 import { HabitDto } from '../../../types/api';
 import { useTheme } from '../../../theme';
-import { HabitCard } from '../components/HabitCard';
+import { CheckInHabitCard } from '../components/CheckInHabitCard';
 import { useHabits } from '../hooks';
 
 type TodayNavigation = CompositeNavigationProp<
@@ -77,6 +77,11 @@ export function TodayScreen() {
     const rest = habits.filter((h) => !h.isScheduledToday).sort(compareHabits);
     return { scheduledToday: today, others: rest };
   }, [data]);
+
+  const allScheduledComplete = useMemo(
+    () => scheduledToday.length > 0 && scheduledToday.every((habit) => habit.completedToday),
+    [scheduledToday],
+  );
 
   const displayName = user?.displayName?.trim() || 'ahí';
   const isEmpty = !isLoading && !isError && (data?.length ?? 0) === 0;
@@ -154,19 +159,38 @@ export function TodayScreen() {
           }
           showsVerticalScrollIndicator={false}
         >
+          {allScheduledComplete ? (
+            <View
+              style={[
+                styles.celebration,
+                {
+                  backgroundColor: `${colors.success}22`,
+                  borderColor: colors.success,
+                  padding: spacing.md,
+                  borderRadius: spacing.md,
+                  marginBottom: spacing.sm,
+                },
+              ]}
+            >
+              <Text style={[typography.subtitle, { color: colors.success }]}>
+                ¡Día completo! 🎉
+              </Text>
+              <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>
+                Completaste todos tus hábitos programados para hoy.
+              </Text>
+            </View>
+          ) : null}
+
           {scheduledToday.length === 0 ? (
             <Text style={[typography.body, { color: colors.textMuted, marginBottom: spacing.md }]}>
               No tienes hábitos programados para hoy.
             </Text>
           ) : (
             scheduledToday.map((habit) => (
-              <HabitCard
+              <CheckInHabitCard
                 key={habit.id}
                 habit={habit}
                 onPress={() => openDetail(habit.id)}
-                onToggleComplete={() => {
-                  // PLAN-08: wire check-in here.
-                }}
               />
             ))
           )}
@@ -188,12 +212,9 @@ export function TodayScreen() {
               {othersExpanded
                 ? others.map((habit) => (
                     <View key={habit.id} style={{ marginTop: spacing.sm }}>
-                      <HabitCard
+                      <CheckInHabitCard
                         habit={habit}
                         onPress={() => openDetail(habit.id)}
-                        onToggleComplete={() => {
-                          // PLAN-08: wire check-in here.
-                        }}
                       />
                     </View>
                   ))
@@ -234,5 +255,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  celebration: {
+    borderWidth: 1,
   },
 });

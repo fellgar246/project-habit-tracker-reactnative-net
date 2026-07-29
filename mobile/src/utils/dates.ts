@@ -1,7 +1,12 @@
+import { getLocalDateString } from './date';
+
+/** @deprecated Use getLocalDateString from ./date instead */
 export function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
+  return getLocalDateString(date);
 }
 
 export function todayIso(): string {
-  return formatDate(new Date());
+  return getLocalDateString();
 }
+
+export { getLocalDateString } from './date';

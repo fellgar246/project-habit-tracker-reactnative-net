@@ -60,3 +60,14 @@ export type CreateHabitRequest = {
 };
 
 export type UpdateHabitRequest = CreateHabitRequest;
+
+export type CheckInResponse = {
+  date: string;
+  currentStreak: number;
+  bestStreak: number;
+};
+
+export type UndoCheckInResponse = {
+  currentStreak: number;
+  bestStreak: number;
+};

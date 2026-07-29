@@ -1,3 +1,4 @@
+using HabitTracker.Application.Exceptions;
 using HabitTracker.Application.Habits.Interfaces;
 using HabitTracker.Domain.Entities;
 using HabitTracker.Infrastructure.Data;
@@ -56,5 +57,31 @@ public class HabitRepository(AppDbContext db) : IHabitRepository
             .Where(l => habitIds.Contains(l.HabitId))
             .Select(l => new ValueTuple<Guid, DateOnly>(l.HabitId, l.Date))
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<HabitLog?> GetLogAsync(
+        Guid habitId,
+        DateOnly date,
+        CancellationToken cancellationToken = default) =>
+        db.HabitLogs.FirstOrDefaultAsync(l => l.HabitId == habitId && l.Date == date, cancellationToken);
+
+    public async Task AddLogAndSaveAsync(HabitLog log, CancellationToken cancellationToken = default)
+    {
+        await db.HabitLogs.AddAsync(log, cancellationToken);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (DbExceptionHelper.IsUniqueConstraintViolation(ex))
+        {
+            throw new ConflictException("A check-in already exists for this date.");
+        }
+    }
+
+    public async Task RemoveLogAndSaveAsync(HabitLog log, CancellationToken cancellationToken = default)
+    {
+        db.HabitLogs.Remove(log);
+        await db.SaveChangesAsync(cancellationToken);
     }
 }

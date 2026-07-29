@@ -28,4 +28,13 @@ public interface IHabitRepository
     Task<IReadOnlyList<(Guid HabitId, DateOnly Date)>> GetCompletedDatesByHabitIdsAsync(
         IReadOnlyCollection<Guid> habitIds,
         CancellationToken cancellationToken = default);
+
+    Task<HabitLog?> GetLogAsync(
+        Guid habitId,
+        DateOnly date,
+        CancellationToken cancellationToken = default);
+
+    Task AddLogAndSaveAsync(HabitLog log, CancellationToken cancellationToken = default);
+
+    Task RemoveLogAndSaveAsync(HabitLog log, CancellationToken cancellationToken = default);
 }

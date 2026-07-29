@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { HabitDto } from '../../../types/api';
 import { useTheme } from '../../../theme';
@@ -6,13 +7,51 @@ import { useTheme } from '../../../theme';
 type HabitCardProps = {
   habit: HabitDto;
   onPress: () => void;
-  /** Extension point for PLAN-08 check-ins. */
   onToggleComplete?: () => void;
+  disabled?: boolean;
 };
 
-export function HabitCard({ habit, onPress, onToggleComplete }: HabitCardProps) {
+export function HabitCard({ habit, onPress, onToggleComplete, disabled = false }: HabitCardProps) {
   const { colors, spacing, typography } = useTheme();
   const completed = habit.completedToday;
+  const checkScale = useRef(new Animated.Value(1)).current;
+  const streakScale = useRef(new Animated.Value(1)).current;
+  const prevStreak = useRef(habit.currentStreak);
+
+  useEffect(() => {
+    if (completed) {
+      Animated.sequence([
+        Animated.spring(checkScale, {
+          toValue: 1.25,
+          friction: 3,
+          useNativeDriver: true,
+        }),
+        Animated.spring(checkScale, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [checkScale, completed]);
+
+  useEffect(() => {
+    if (habit.currentStreak !== prevStreak.current) {
+      Animated.sequence([
+        Animated.timing(streakScale, {
+          toValue: 1.3,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+        Animated.timing(streakScale, {
+          toValue: 1,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      prevStreak.current = habit.currentStreak;
+    }
+  }, [habit.currentStreak, streakScale]);
 
   return (
     <Pressable
@@ -45,15 +84,25 @@ export function HabitCard({ habit, onPress, onToggleComplete }: HabitCardProps) 
         <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]} numberOfLines={1}>
           {habit.name}
         </Text>
-        <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>
+        <Animated.Text
+          style={[
+            typography.caption,
+            {
+              color: colors.textMuted,
+              marginTop: 2,
+              transform: [{ scale: streakScale }],
+            },
+          ]}
+        >
           🔥 {habit.currentStreak}
-        </Text>
+        </Animated.Text>
       </View>
 
       <Pressable
         accessibilityRole="checkbox"
-        accessibilityState={{ checked: completed }}
+        accessibilityState={{ checked: completed, disabled }}
         accessibilityLabel={completed ? 'Completado hoy' : 'Marcar como completado'}
+        disabled={disabled}
         hitSlop={8}
         onPress={() => {
           onToggleComplete?.();
@@ -63,10 +112,13 @@ export function HabitCard({ habit, onPress, onToggleComplete }: HabitCardProps) 
           {
             borderColor: completed ? colors.success : colors.border,
             backgroundColor: completed ? colors.success : 'transparent',
+            opacity: disabled ? 0.5 : 1,
           },
         ]}
       >
-        {completed ? <Text style={styles.checkMark}>✓</Text> : null}
+        <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+          {completed ? <Text style={styles.checkMark}>✓</Text> : null}
+        </Animated.View>
       </Pressable>
     </Pressable>
   );
