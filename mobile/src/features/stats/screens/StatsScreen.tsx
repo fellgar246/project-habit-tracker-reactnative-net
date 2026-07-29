@@ -8,7 +8,8 @@ import {
   View,
 } from 'react-native';
 
-import { Card, EmptyState, Screen } from '../../../components';
+import { Button, Card, EmptyState, Screen, SkeletonList } from '../../../components';
+import { getUserFriendlyError } from '../../../utils/errors';
 import { HabitDto } from '../../../types/api';
 import { useTheme } from '../../../theme';
 import { WEEKDAY_FULL_LABELS } from '../../../utils/month';
@@ -182,8 +183,9 @@ export function StatsScreen() {
         {summaryError ? (
           <View>
             <Text style={[typography.body, { color: colors.danger, marginBottom: spacing.md }]}>
-              {summaryErr?.message ?? 'No se pudieron cargar las estadísticas'}
+              {getUserFriendlyError(summaryErr, 'No se pudieron cargar las estadísticas')}
             </Text>
+            <Button title="Reintentar" onPress={() => void refetchSummary()} />
           </View>
         ) : null}
 
@@ -219,9 +221,7 @@ export function StatsScreen() {
           />
         ) : null}
 
-        {isLoading ? (
-          <Text style={[typography.body, { color: colors.textMuted }]}>Cargando gráficas…</Text>
-        ) : null}
+        {isLoading ? <SkeletonList count={2} itemHeight={120} /> : null}
 
         {!isLoading && !hasEnoughData ? (
           <EmptyState

@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { isApiError } from '../../../api/errors';
 import { Button, Input, Screen } from '../../../components';
+import { useToast } from '../../../components/Toast';
+import { getUserFriendlyError } from '../../../utils/errors';
 import { AuthStackParamList } from '../../../navigation/types';
 import { useTheme } from '../../../theme';
 import { useAuth } from '../AuthContext';
@@ -17,6 +19,7 @@ type LoginNavigation = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 export function LoginScreen() {
   const { typography, colors, spacing } = useTheme();
   const { login } = useAuth();
+  const toast = useToast();
   const navigation = useNavigation<LoginNavigation>();
 
   const [email, setEmail] = useState('');
@@ -57,10 +60,10 @@ export function LoginScreen() {
         if (error.status === 401) {
           setApiError('Correo o contraseña incorrectos');
         } else {
-          setApiError(error.detail ?? error.title);
+          toast.show(getUserFriendlyError(error, 'No se pudo iniciar sesión'));
         }
       } else {
-        setApiError('No se pudo iniciar sesión. Intenta de nuevo.');
+        toast.show('No se pudo iniciar sesión. Intenta de nuevo.');
       }
     } finally {
       setLoading(false);

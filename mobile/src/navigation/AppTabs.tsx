@@ -1,16 +1,35 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { CommonActions, NavigationProp, useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCallback } from 'react';
 
 import { TodayScreen } from '../features/habits/screens/TodayScreen';
-import { ProfileScreen } from '../features/profile/screens/ProfileScreen';
+import { SettingsScreen } from '../features/settings/screens/SettingsScreen';
 import { StatsScreen } from '../features/stats/screens/StatsScreen';
+import {
+  useNotificationNavigation,
+  useNotificationSync,
+} from '../features/notifications/useNotificationSync';
 import { useTheme } from '../theme';
-import { AppTabsParamList } from './types';
+import { AppStackParamList, AppTabsParamList } from './types';
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
 
 export function AppTabs() {
   const { colors } = useTheme();
+  const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+
+  const navigateToToday = useCallback(() => {
+    navigation.dispatch(
+      CommonActions.navigate({
+        name: 'Tabs',
+        params: { screen: 'Today' },
+      }),
+    );
+  }, [navigation]);
+
+  useNotificationSync();
+  useNotificationNavigation(navigateToToday);
 
   return (
     <Tab.Navigator
@@ -30,7 +49,11 @@ export function AppTabs() {
     >
       <Tab.Screen name="Today" component={TodayScreen} options={{ title: 'Hoy' }} />
       <Tab.Screen name="Stats" component={StatsScreen} options={{ title: 'Estadísticas' }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ title: 'Perfil' }} />
+      <Tab.Screen
+        name="Settings"
+        component={SettingsScreen}
+        options={{ title: 'Ajustes' }}
+      />
     </Tab.Navigator>
   );
 }
@@ -41,8 +64,8 @@ function getTabIcon(routeName: keyof AppTabsParamList): keyof typeof Ionicons.gl
       return 'today-outline';
     case 'Stats':
       return 'bar-chart-outline';
-    case 'Profile':
-      return 'person-outline';
+    case 'Settings':
+      return 'settings-outline';
     default:
       return 'ellipse-outline';
   }

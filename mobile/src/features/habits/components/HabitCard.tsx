@@ -110,15 +110,24 @@ export function HabitCard({ habit, onPress, onToggleComplete, disabled = false }
         style={[
           styles.check,
           {
-            borderColor: completed ? colors.success : colors.border,
-            backgroundColor: completed ? colors.success : 'transparent',
             opacity: disabled ? 0.5 : 1,
           },
         ]}
       >
-        <Animated.View style={{ transform: [{ scale: checkScale }] }}>
-          {completed ? <Text style={styles.checkMark}>✓</Text> : null}
-        </Animated.View>
+        <View
+          style={[
+            styles.checkInner,
+            {
+              borderColor: completed ? colors.success : colors.border,
+              backgroundColor: completed ? colors.success : 'transparent',
+              borderWidth: 2,
+            },
+          ]}
+        >
+          <Animated.View style={{ transform: [{ scale: checkScale }] }}>
+            {completed ? <Text style={styles.checkMark}>✓</Text> : null}
+          </Animated.View>
+        </View>
       </Pressable>
     </Pressable>
   );
@@ -145,10 +154,17 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   check: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkInner: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },

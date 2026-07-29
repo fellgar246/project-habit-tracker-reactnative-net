@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-import { Button, EmptyState, Screen } from '../../../components';
+import { Button, EmptyState, Screen, SkeletonList } from '../../../components';
+import { getUserFriendlyError } from '../../../utils/errors';
 import { useAuth } from '../../auth/AuthContext';
 import { AppStackParamList, AppTabsParamList } from '../../../navigation/types';
 import { HabitDto } from '../../../types/api';
@@ -45,23 +46,7 @@ function formatTodayHeading(date: Date): string {
 }
 
 function HabitSkeleton() {
-  const { colors, spacing } = useTheme();
-
-  return (
-    <View style={{ gap: spacing.sm }}>
-      {[0, 1, 2].map((key) => (
-        <View
-          key={key}
-          style={{
-            height: 72,
-            borderRadius: spacing.md,
-            backgroundColor: colors.border,
-            opacity: 0.45,
-          }}
-        />
-      ))}
-    </View>
-  );
+  return <SkeletonList count={3} itemHeight={72} />;
 }
 
 export function TodayScreen() {
@@ -131,7 +116,7 @@ export function TodayScreen() {
               { color: colors.danger, textAlign: 'center', marginBottom: spacing.md },
             ]}
           >
-            {error?.message ?? 'No se pudieron cargar los hábitos'}
+            {getUserFriendlyError(error, 'No se pudieron cargar los hábitos')}
           </Text>
           <Button title="Reintentar" onPress={() => void refetch()} />
         </View>
@@ -242,9 +227,9 @@ const styles = StyleSheet.create({
     paddingRight: 12,
   },
   addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

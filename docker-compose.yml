@@ -33,6 +33,7 @@ services:
       Jwt__Key: ${JWT__Key}
       Jwt__AccessTokenMinutes: ${JWT__AccessTokenMinutes:-15}
       Jwt__RefreshTokenDays: ${JWT__RefreshTokenDays:-7}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
 
 volumes:
   pgdata:

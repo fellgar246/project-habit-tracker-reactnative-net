@@ -8,7 +8,7 @@ export type AuthStackParamList = {
 export type AppTabsParamList = {
   Today: undefined;
   Stats: undefined;
-  Profile: undefined;
+  Settings: undefined;
 };
 
 export type AppStackParamList = {

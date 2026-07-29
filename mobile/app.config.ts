@@ -25,7 +25,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   web: {
     favicon: './assets/favicon.png',
   },
-  plugins: ['expo-secure-store'],
+  plugins: [
+    'expo-secure-store',
+    [
+      'expo-notifications',
+      {
+        icon: './assets/icon.png',
+        color: '#3B82F6',
+      },
+    ],
+  ],
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_URL,
   },

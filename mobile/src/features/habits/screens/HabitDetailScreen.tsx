@@ -3,7 +3,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, Screen } from '../../../components';
+import { Button, Card, Screen, SkeletonList } from '../../../components';
+import { getUserFriendlyError } from '../../../utils/errors';
 import { AppStackParamList } from '../../../navigation/types';
 import { useTheme } from '../../../theme';
 import { getCurrentMonth } from '../../../utils/month';
@@ -59,14 +60,12 @@ export function HabitDetailScreen() {
 
   return (
     <Screen scroll>
-      {isLoading ? (
-        <Text style={[typography.body, { color: colors.textMuted }]}>Cargando…</Text>
-      ) : null}
+      {isLoading ? <SkeletonList count={3} itemHeight={80} /> : null}
 
       {isError ? (
         <View>
           <Text style={[typography.body, { color: colors.danger, marginBottom: spacing.md }]}>
-            {error.message}
+            {getUserFriendlyError(error, 'No se pudo cargar el hábito')}
           </Text>
           <Button title="Reintentar" onPress={() => void refetch()} />
         </View>

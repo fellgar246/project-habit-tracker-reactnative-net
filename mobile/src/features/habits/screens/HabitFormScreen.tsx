@@ -12,7 +12,11 @@ import {
 } from 'react-native';
 
 import { isApiError } from '../../../api/errors';
-import { Button, Input, Screen } from '../../../components';
+import { Button, Input, Screen, SkeletonList } from '../../../components';
+import {
+  openNotificationSettings,
+  requestPermissions,
+} from '../../notifications/scheduler';
 import { AppStackParamList } from '../../../navigation/types';
 import { ScheduleType } from '../../../types/api';
 import { useTheme } from '../../../theme';
@@ -104,6 +108,7 @@ export function HabitFormScreen() {
   const [values, setValues] = useState<HabitFormValues>(defaultValues);
   const [fieldErrors, setFieldErrors] = useState<HabitFieldErrors>({});
   const [apiError, setApiError] = useState<string | null>(null);
+  const [reminderPermissionDenied, setReminderPermissionDenied] = useState(false);
   const [hydrated, setHydrated] = useState(!isEdit);
   const initialSnapshot = useRef(snapshot(defaultValues()));
   const allowLeaveRef = useRef(false);
@@ -160,6 +165,26 @@ export function HabitFormScreen() {
     setValues((current) => ({ ...current, [key]: value }));
     setFieldErrors((current) => ({ ...current, [key]: undefined }));
     setApiError(null);
+  }
+
+  async function handleReminderToggle(enabled: boolean) {
+    patch('reminderEnabled', enabled);
+
+    if (!enabled) {
+      setReminderPermissionDenied(false);
+      return;
+    }
+
+    const status = await requestPermissions();
+    if (status === 'granted') {
+      setReminderPermissionDenied(false);
+      return;
+    }
+
+    setReminderPermissionDenied(true);
+    if (status === 'denied') {
+      patch('reminderEnabled', false);
+    }
   }
 
   async function handleSave() {
@@ -250,7 +275,7 @@ export function HabitFormScreen() {
   if (isEdit && habitQuery.isLoading && !hydrated) {
     return (
       <Screen>
-        <Text style={[typography.body, { color: colors.textMuted }]}>Cargando hábito…</Text>
+        <SkeletonList count={4} itemHeight={48} />
       </Screen>
     );
   }
@@ -456,11 +481,24 @@ export function HabitFormScreen() {
           <View style={styles.reminderHeader}>
             <Text style={[typography.caption, { color: colors.text }]}>Recordatorio</Text>
             <Switch
+              accessibilityLabel="Activar recordatorio"
               value={values.reminderEnabled}
-              onValueChange={(enabled) => patch('reminderEnabled', enabled)}
+              onValueChange={(enabled) => void handleReminderToggle(enabled)}
               trackColor={{ false: colors.border, true: colors.primary }}
             />
           </View>
+          {reminderPermissionDenied ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Abrir ajustes del sistema para notificaciones"
+              onPress={() => openNotificationSettings()}
+              style={{ marginTop: spacing.sm }}
+            >
+              <Text style={[typography.caption, { color: colors.primary }]}>
+                Activa las notificaciones en Ajustes del sistema para usar recordatorios.
+              </Text>
+            </Pressable>
+          ) : null}
           {values.reminderEnabled ? (
             <View style={[styles.timePicker, { marginTop: spacing.sm }]}>
               <Pressable

@@ -33,6 +33,10 @@ export async function archiveHabit(id: string): Promise<void> {
   return apiClient.post<void>(`/habits/${id}/archive`);
 }
 
+export async function unarchiveHabit(id: string): Promise<HabitDto> {
+  return apiClient.post<HabitDto>(`/habits/${id}/unarchive`);
+}
+
 export async function checkIn(habitId: string, date: string): Promise<CheckInResponse> {
   return apiClient.post<CheckInResponse>(`/habits/${habitId}/checkins`, { date });
 }

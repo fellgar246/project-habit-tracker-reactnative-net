@@ -6,6 +6,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { isApiError } from '../../../api/errors';
 import { Button, Input, Screen } from '../../../components';
+import { useToast } from '../../../components/Toast';
+import { getUserFriendlyError } from '../../../utils/errors';
 import { AuthStackParamList } from '../../../navigation/types';
 import { useTheme } from '../../../theme';
 import { useAuth } from '../AuthContext';
@@ -24,6 +26,7 @@ type FieldErrors = {
 export function RegisterScreen() {
   const { typography, colors, spacing } = useTheme();
   const { register } = useAuth();
+  const toast = useToast();
   const navigation = useNavigation<RegisterNavigation>();
 
   const [displayName, setDisplayName] = useState('');
@@ -75,10 +78,10 @@ export function RegisterScreen() {
         if (error.status === 409) {
           setApiError('Ese correo ya está registrado');
         } else {
-          setApiError(error.detail ?? error.title);
+          toast.show(getUserFriendlyError(error, 'No se pudo crear la cuenta'));
         }
       } else {
-        setApiError('No se pudo crear la cuenta. Intenta de nuevo.');
+        toast.show('No se pudo crear la cuenta. Intenta de nuevo.');
       }
     } finally {
       setLoading(false);

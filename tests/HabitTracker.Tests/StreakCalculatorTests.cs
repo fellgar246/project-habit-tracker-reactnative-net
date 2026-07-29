@@ -263,5 +263,38 @@ public class StreakCalculatorTests
         Assert.Equal(new StreakResult(0, 0), result);
     }
 
-    private static HashSet<DateOnly> Dates(params DateOnly[] dates) => [..dates];
+    [Fact]
+    public void Calculate_SpecificDaysWithNullScheduleDays_ReturnsZeroStreaks()
+    {
+        var today = new DateOnly(2025, 1, 10);
+        var completed = Dates(today);
+
+        var result = StreakCalculator.Calculate(
+            ScheduleType.SpecificDays,
+            scheduleDays: null,
+            Start,
+            completed,
+            today);
+
+        Assert.Equal(new StreakResult(0, 0), result);
+    }
+
+    [Fact]
+    public void Calculate_BrokenStreakPreservesBestStreak()
+    {
+        var today = new DateOnly(2025, 1, 20);
+        var completed = Dates(
+            new DateOnly(2025, 1, 1),
+            new DateOnly(2025, 1, 2),
+            new DateOnly(2025, 1, 3),
+            new DateOnly(2025, 1, 4),
+            new DateOnly(2025, 1, 5),
+            today);
+
+        var result = StreakCalculator.Calculate(ScheduleType.Daily, null, Start, completed, today);
+
+        Assert.Equal(new StreakResult(1, 5), result);
+    }
+
+    private static HashSet<DateOnly> Dates(params DateOnly[] dates) => [.. dates];
 }

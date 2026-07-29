@@ -5,8 +5,20 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 
-import { CreateHabitRequest, HabitDto, HabitLogsResponse, HabitStatsResponse, UpdateHabitRequest } from '../../types/api';
 import { useToast } from '../../components/Toast';
+import {
+  CreateHabitRequest,
+  HabitDto,
+  HabitLogsResponse,
+  HabitStatsResponse,
+  UpdateHabitRequest,
+} from '../../types/api';
+import { getUserFriendlyError } from '../../utils/errors';
+import {
+  cancelForHabit,
+  rescheduleAll,
+  scheduleForHabit,
+} from '../notifications/scheduler';
 import * as habitsApi from './api';
 
 export const habitsQueryKey = ['habits'] as const;
@@ -98,36 +110,68 @@ export function useHabitStats(
 
 export function useCreateHabit() {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: (request: CreateHabitRequest) => habitsApi.createHabit(request),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: habitsQueryKey });
+    onSuccess: async (habit) => {
+      await queryClient.invalidateQueries({ queryKey: habitsQueryKey });
+      await scheduleForHabit(habit);
+    },
+    onError: (error) => {
+      toast.show(getUserFriendlyError(error, 'No se pudo crear el hábito'));
     },
   });
 }
 
 export function useUpdateHabit() {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: ({ id, request }: { id: string; request: UpdateHabitRequest }) =>
       habitsApi.updateHabit(id, request),
-    onSuccess: (habit) => {
-      void queryClient.invalidateQueries({ queryKey: habitsQueryKey });
+    onSuccess: async (habit) => {
+      await queryClient.invalidateQueries({ queryKey: habitsQueryKey });
       queryClient.setQueryData(habitQueryKey(habit.id), habit);
+      await scheduleForHabit(habit);
+    },
+    onError: (error) => {
+      toast.show(getUserFriendlyError(error, 'No se pudo actualizar el hábito'));
     },
   });
 }
 
 export function useArchiveHabit() {
   const queryClient = useQueryClient();
+  const toast = useToast();
 
   return useMutation({
     mutationFn: (id: string) => habitsApi.archiveHabit(id),
-    onSuccess: (_data, id) => {
-      void queryClient.invalidateQueries({ queryKey: habitsQueryKey });
+    onSuccess: async (_data, id) => {
+      await cancelForHabit(id);
+      await queryClient.invalidateQueries({ queryKey: habitsQueryKey });
       queryClient.removeQueries({ queryKey: habitQueryKey(id) });
+    },
+    onError: (error) => {
+      toast.show(getUserFriendlyError(error, 'No se pudo archivar el hábito'));
+    },
+  });
+}
+
+export function useUnarchiveHabit() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  return useMutation({
+    mutationFn: (id: string) => habitsApi.unarchiveHabit(id),
+    onSuccess: async (habit) => {
+      await queryClient.invalidateQueries({ queryKey: habitsQueryKey });
+      queryClient.setQueryData(habitQueryKey(habit.id), habit);
+      await scheduleForHabit(habit);
+    },
+    onError: (error) => {
+      toast.show(getUserFriendlyError(error, 'No se pudo restaurar el hábito'));
     },
   });
 }
