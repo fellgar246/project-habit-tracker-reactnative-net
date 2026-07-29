@@ -24,4 +24,8 @@ public interface IHabitRepository
     Task AddAsync(Habit habit, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<(Guid HabitId, DateOnly Date)>> GetCompletedDatesByHabitIdsAsync(
+        IReadOnlyCollection<Guid> habitIds,
+        CancellationToken cancellationToken = default);
 }

@@ -3,6 +3,7 @@ using HabitTracker.Application.Habits.DTOs;
 using HabitTracker.Application.Habits.Interfaces;
 using HabitTracker.Domain.Entities;
 using HabitTracker.Domain.Enums;
+using HabitTracker.Domain.Streaks;
 
 namespace HabitTracker.Application.Habits;
 
@@ -20,8 +21,11 @@ public class HabitService(IHabitRepository habitRepository)
     {
         var habits = await habitRepository.ListByUserAsync(userId, includeArchived, cancellationToken);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var completedDatesByHabit = await LoadCompletedDatesAsync(habits, cancellationToken);
 
-        return habits.Select(h => MapHabit(h, today)).ToList();
+        return habits
+            .Select(h => MapHabit(h, today, completedDatesByHabit.GetValueOrDefault(h.Id)))
+            .ToList();
     }
 
     public async Task<HabitDto> GetByIdAsync(
@@ -34,7 +38,10 @@ public class HabitService(IHabitRepository habitRepository)
         if (habit is null)
             throw new NotFoundException(HabitNotFoundMessage);
 
-        return MapHabit(habit, DateOnly.FromDateTime(DateTime.UtcNow));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var completedDates = await LoadCompletedDatesAsync([habit], cancellationToken);
+
+        return MapHabit(habit, today, completedDates.GetValueOrDefault(habit.Id));
     }
 
     public async Task<HabitDto> CreateAsync(
@@ -63,7 +70,7 @@ public class HabitService(IHabitRepository habitRepository)
         await habitRepository.AddAsync(habit, cancellationToken);
         await habitRepository.SaveChangesAsync(cancellationToken);
 
-        return MapHabit(habit, DateOnly.FromDateTime(DateTime.UtcNow));
+        return MapHabit(habit, DateOnly.FromDateTime(DateTime.UtcNow), completedDates: null);
     }
 
     public async Task<HabitDto> UpdateAsync(
@@ -90,7 +97,10 @@ public class HabitService(IHabitRepository habitRepository)
 
         await habitRepository.SaveChangesAsync(cancellationToken);
 
-        return MapHabit(habit, DateOnly.FromDateTime(DateTime.UtcNow));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var completedDates = await LoadCompletedDatesAsync([habit], cancellationToken);
+
+        return MapHabit(habit, today, completedDates.GetValueOrDefault(habit.Id));
     }
 
     public async Task ArchiveAsync(
@@ -130,8 +140,45 @@ public class HabitService(IHabitRepository habitRepository)
         }
     }
 
-    private static HabitDto MapHabit(Habit habit, DateOnly today) =>
-        new(
+    private async Task<IReadOnlyDictionary<Guid, HashSet<DateOnly>>> LoadCompletedDatesAsync(
+        IReadOnlyList<Habit> habits,
+        CancellationToken cancellationToken)
+    {
+        var habitIds = habits.Select(h => h.Id).ToList();
+        var rows = await habitRepository.GetCompletedDatesByHabitIdsAsync(habitIds, cancellationToken);
+
+        var completedDatesByHabit = new Dictionary<Guid, HashSet<DateOnly>>();
+
+        foreach (var (habitId, date) in rows)
+        {
+            if (!completedDatesByHabit.TryGetValue(habitId, out var dates))
+            {
+                dates = [];
+                completedDatesByHabit[habitId] = dates;
+            }
+
+            dates.Add(date);
+        }
+
+        return completedDatesByHabit;
+    }
+
+    private static HabitDto MapHabit(Habit habit, DateOnly today, HashSet<DateOnly>? completedDates)
+    {
+        var habitStartDate = DateOnly.FromDateTime(habit.CreatedAt);
+        var isScheduledToday = habit.IsScheduledOn(today);
+        var completedToday = completedDates?.Contains(today) ?? false;
+
+        var streaks = completedDates is null || completedDates.Count == 0
+            ? new StreakResult(0, 0)
+            : StreakCalculator.Calculate(
+                habit.ScheduleType,
+                habit.ScheduleDays,
+                habitStartDate,
+                completedDates,
+                today);
+
+        return new HabitDto(
             habit.Id,
             habit.Name,
             habit.Description,
@@ -142,10 +189,11 @@ public class HabitService(IHabitRepository habitRepository)
             habit.ReminderTime?.ToString("HH:mm"),
             habit.IsArchived,
             habit.CreatedAt,
-            CurrentStreak: 0,
-            BestStreak: 0,
-            CompletedToday: false,
-            IsScheduledToday: habit.IsScheduledOn(today));
+            streaks.CurrentStreak,
+            streaks.BestStreak,
+            completedToday,
+            isScheduledToday);
+    }
 
     private static TimeOnly? ParseReminderTime(string? reminderTime) =>
         reminderTime is null

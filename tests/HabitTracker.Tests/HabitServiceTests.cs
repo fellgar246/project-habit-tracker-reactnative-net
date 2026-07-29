@@ -6,6 +6,7 @@ using HabitTracker.Application.Habits;
 using HabitTracker.Application.Habits.DTOs;
 using HabitTracker.Application.Habits.Interfaces;
 using HabitTracker.Domain;
+using HabitTracker.Domain.Entities;
 using HabitTracker.Domain.Enums;
 using HabitTracker.Infrastructure.Auth;
 using HabitTracker.Infrastructure.Data;
@@ -104,6 +105,74 @@ public class HabitServiceTests : IDisposable
         await Assert.ThrowsAsync<ConflictException>(() =>
             _habitService.UpdateAsync(userId, habit.Id, ValidUpdateRequest("Updated stretch")));
     }
+
+    [Fact]
+    public async Task ListAsync_WithHabitLogs_ReturnsCalculatedStreaks()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habit = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var trackedHabit = await _db.Habits.FindAsync(habit.Id);
+
+        trackedHabit!.CreatedAt = today.AddDays(-10).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        await _db.SaveChangesAsync();
+
+        _db.ChangeTracker.Clear();
+
+        _db.HabitLogs.AddRange(
+            CreateLog(habit.Id, today.AddDays(-2)),
+            CreateLog(habit.Id, today.AddDays(-1)));
+
+        await _db.SaveChangesAsync();
+
+        var habits = await _habitService.ListAsync(userId);
+        var result = Assert.Single(habits);
+
+        Assert.Equal(2, result.CurrentStreak);
+        Assert.Equal(2, result.BestStreak);
+        Assert.False(result.CompletedToday);
+    }
+
+    [Fact]
+    public async Task ListAsync_MultipleHabits_ReturnsDistinctStreaksInSingleLoad()
+    {
+        var userId = await RegisterUserAsync("user@example.com");
+        var habitA = await _habitService.CreateAsync(userId, ValidCreateRequest("Read"));
+        var habitB = await _habitService.CreateAsync(userId, ValidCreateRequest("Run"));
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        foreach (var habit in await _db.Habits.Where(h => h.UserId == userId).ToListAsync())
+            habit.CreatedAt = today.AddDays(-10).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+
+        _db.HabitLogs.AddRange(
+            CreateLog(habitA.Id, today.AddDays(-1)),
+            CreateLog(habitA.Id, today),
+            CreateLog(habitB.Id, today.AddDays(-1)));
+
+        await _db.SaveChangesAsync();
+        _db.ChangeTracker.Clear();
+
+        var habits = await _habitService.ListAsync(userId);
+
+        Assert.Equal(2, habits.Count);
+
+        var read = habits.Single(h => h.Name == "Read");
+        var run = habits.Single(h => h.Name == "Run");
+
+        Assert.Equal(2, read.CurrentStreak);
+        Assert.True(read.CompletedToday);
+        Assert.Equal(1, run.CurrentStreak);
+        Assert.False(run.CompletedToday);
+    }
+
+    private static HabitLog CreateLog(Guid habitId, DateOnly date) =>
+        new()
+        {
+            Id = Guid.NewGuid(),
+            HabitId = habitId,
+            Date = date,
+            CompletedAt = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
+        };
 
     private async Task<Guid> RegisterUserAsync(string email)
     {

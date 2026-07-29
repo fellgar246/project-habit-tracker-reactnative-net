@@ -11,9 +11,15 @@ export type AppTabsParamList = {
   Profile: undefined;
 };
 
+export type AppStackParamList = {
+  Tabs: NavigatorScreenParams<AppTabsParamList> | undefined;
+  HabitForm: { habitId?: string } | undefined;
+  HabitDetail: { habitId: string };
+};
+
 export type RootStackParamList = {
   Auth: NavigatorScreenParams<AuthStackParamList>;
-  App: NavigatorScreenParams<AppTabsParamList>;
+  App: NavigatorScreenParams<AppStackParamList>;
 };
 
 declare global {

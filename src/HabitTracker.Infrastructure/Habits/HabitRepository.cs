@@ -43,4 +43,18 @@ public class HabitRepository(AppDbContext db) : IHabitRepository
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         db.SaveChangesAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<(Guid HabitId, DateOnly Date)>> GetCompletedDatesByHabitIdsAsync(
+        IReadOnlyCollection<Guid> habitIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (habitIds.Count == 0)
+            return [];
+
+        return await db.HabitLogs
+            .AsNoTracking()
+            .Where(l => habitIds.Contains(l.HabitId))
+            .Select(l => new ValueTuple<Guid, DateOnly>(l.HabitId, l.Date))
+            .ToListAsync(cancellationToken);
+    }
 }

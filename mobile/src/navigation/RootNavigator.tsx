@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../features/auth/AuthContext';
 import { SplashScreen } from '../features/auth/screens/SplashScreen';
 import { useTheme } from '../theme';
-import { AppTabs } from './AppTabs';
+import { AppStack } from './AppStack';
 import { AuthStack } from './AuthStack';
 import { RootStackParamList } from './types';
 
@@ -47,7 +47,7 @@ export function RootNavigator() {
       <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          <Stack.Screen name="App" component={AppTabs} />
+          <Stack.Screen name="App" component={AppStack} />
         ) : (
           <Stack.Screen name="Auth" component={AuthStack} />
         )}

@@ -23,3 +23,40 @@ export type AuthResponse = {
   refreshToken: string;
   accessTokenExpiresAt: string;
 };
+
+/** Matches backend ScheduleType enum (numeric JSON). */
+export const ScheduleType = {
+  Daily: 0,
+  SpecificDays: 1,
+} as const;
+
+export type ScheduleType = (typeof ScheduleType)[keyof typeof ScheduleType];
+
+export type HabitDto = {
+  id: string;
+  name: string;
+  description: string | null;
+  icon: string;
+  color: string;
+  scheduleType: ScheduleType;
+  scheduleDays: number | null;
+  reminderTime: string | null;
+  isArchived: boolean;
+  createdAt: string;
+  currentStreak: number;
+  bestStreak: number;
+  completedToday: boolean;
+  isScheduledToday: boolean;
+};
+
+export type CreateHabitRequest = {
+  name: string;
+  description?: string | null;
+  icon: string;
+  color: string;
+  scheduleType: ScheduleType;
+  scheduleDays?: number | null;
+  reminderTime?: string | null;
+};
+
+export type UpdateHabitRequest = CreateHabitRequest;
