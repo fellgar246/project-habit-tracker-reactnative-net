@@ -19,6 +19,8 @@ public static class HabitsEndpoints
         group.MapPost("/{id:guid}/unarchive", UnarchiveAsync);
         group.MapPost("/{id:guid}/checkins", CheckInAsync);
         group.MapDelete("/{id:guid}/checkins/{date}", UndoCheckInAsync);
+        group.MapGet("/{id:guid}/logs", GetLogsAsync);
+        group.MapGet("/{id:guid}/stats", GetStatsAsync);
 
         return group;
     }
@@ -124,6 +126,42 @@ public static class HabitsEndpoints
 
         var userId = RequireUserId(currentUser);
         var response = await habitService.UndoCheckInAsync(userId, id, parsedDate, cancellationToken);
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetLogsAsync(
+        Guid id,
+        ICurrentUser currentUser,
+        HabitService habitService,
+        string? month = null,
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var year = today.Year;
+        var monthNumber = today.Month;
+
+        if (month is not null)
+        {
+            if (!DateOnly.TryParseExact($"{month}-01", "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedMonth))
+                return Results.BadRequest(new { title = "Invalid month.", detail = "Month must be in YYYY-MM format." });
+
+            year = parsedMonth.Year;
+            monthNumber = parsedMonth.Month;
+        }
+
+        var userId = RequireUserId(currentUser);
+        var response = await habitService.GetLogsAsync(userId, id, year, monthNumber, cancellationToken);
+        return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetStatsAsync(
+        Guid id,
+        ICurrentUser currentUser,
+        HabitService habitService,
+        CancellationToken cancellationToken)
+    {
+        var userId = RequireUserId(currentUser);
+        var response = await habitService.GetStatsAsync(userId, id, cancellationToken);
         return Results.Ok(response);
     }
 

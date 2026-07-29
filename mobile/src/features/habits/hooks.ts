@@ -5,7 +5,7 @@ import {
   UseQueryResult,
 } from '@tanstack/react-query';
 
-import { CreateHabitRequest, HabitDto, UpdateHabitRequest } from '../../types/api';
+import { CreateHabitRequest, HabitDto, HabitLogsResponse, HabitStatsResponse, UpdateHabitRequest } from '../../types/api';
 import { useToast } from '../../components/Toast';
 import * as habitsApi from './api';
 
@@ -14,6 +14,18 @@ export const statsQueryKey = ['stats'] as const;
 
 export function habitQueryKey(id: string) {
   return ['habits', id] as const;
+}
+
+export function habitLogsQueryKey(habitId: string, month: string) {
+  return ['habits', habitId, 'logs', month] as const;
+}
+
+export function habitStatsQueryKey(habitId: string) {
+  return ['habits', habitId, 'stats'] as const;
+}
+
+export function statsSummaryQueryKey() {
+  return [...statsQueryKey, 'summary'] as const;
 }
 
 function updateHabitInListCache(
@@ -60,6 +72,27 @@ export function useHabit(id: string | undefined): UseQueryResult<HabitDto, Error
     queryKey: habitQueryKey(id ?? ''),
     queryFn: () => habitsApi.getHabit(id!),
     enabled: Boolean(id),
+  });
+}
+
+export function useHabitLogs(
+  habitId: string | undefined,
+  month: string,
+): UseQueryResult<HabitLogsResponse, Error> {
+  return useQuery({
+    queryKey: habitLogsQueryKey(habitId ?? '', month),
+    queryFn: () => habitsApi.getHabitLogs(habitId!, month),
+    enabled: Boolean(habitId),
+  });
+}
+
+export function useHabitStats(
+  habitId: string | undefined,
+): UseQueryResult<HabitStatsResponse, Error> {
+  return useQuery({
+    queryKey: habitStatsQueryKey(habitId ?? ''),
+    queryFn: () => habitsApi.getHabitStats(habitId!),
+    enabled: Boolean(habitId),
   });
 }
 
@@ -131,6 +164,8 @@ export function useCheckIn(habitId: string) {
       void queryClient.invalidateQueries({ queryKey: habitsQueryKey });
       void queryClient.invalidateQueries({ queryKey: habitQueryKey(habitId) });
       void queryClient.invalidateQueries({ queryKey: statsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: habitStatsQueryKey(habitId) });
+      void queryClient.invalidateQueries({ queryKey: ['habits', habitId, 'logs'] });
     },
   });
 }
@@ -167,6 +202,8 @@ export function useUndoCheckIn(habitId: string) {
       void queryClient.invalidateQueries({ queryKey: habitsQueryKey });
       void queryClient.invalidateQueries({ queryKey: habitQueryKey(habitId) });
       void queryClient.invalidateQueries({ queryKey: statsQueryKey });
+      void queryClient.invalidateQueries({ queryKey: habitStatsQueryKey(habitId) });
+      void queryClient.invalidateQueries({ queryKey: ['habits', habitId, 'logs'] });
     },
   });
 }

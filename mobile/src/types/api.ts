@@ -71,3 +71,51 @@ export type UndoCheckInResponse = {
   currentStreak: number;
   bestStreak: number;
 };
+
+export type HabitLogsResponse = {
+  month: string;
+  scheduledDates: string[];
+  completedDates: string[];
+};
+
+export type WeekdayStatsDto = {
+  weekday: number;
+  scheduled: number;
+  completed: number;
+};
+
+export type HabitDayStatsDto = {
+  date: string;
+  scheduled: boolean;
+  completed: boolean;
+};
+
+export type HabitStatsResponse = {
+  currentStreak: number;
+  bestStreak: number;
+  totalCompletions: number;
+  completionRate30d: number | null;
+  byWeekday: WeekdayStatsDto[];
+  last30Days: HabitDayStatsDto[];
+};
+
+export type LongestCurrentStreakDto = {
+  habitId: string;
+  habitName: string;
+  streak: number;
+};
+
+export type SummaryDayStatsDto = {
+  date: string;
+  completed: number;
+  scheduled: number;
+};
+
+export type StatsSummaryResponse = {
+  activeHabits: number;
+  completedToday: number;
+  scheduledToday: number;
+  longestCurrentStreak: LongestCurrentStreakDto | null;
+  last30Days: SummaryDayStatsDto[];
+  byWeekday: WeekdayStatsDto[];
+};

@@ -3,6 +3,8 @@ import {
   CheckInResponse,
   CreateHabitRequest,
   HabitDto,
+  HabitLogsResponse,
+  HabitStatsResponse,
   UndoCheckInResponse,
   UpdateHabitRequest,
 } from '../../types/api';
@@ -37,4 +39,12 @@ export async function checkIn(habitId: string, date: string): Promise<CheckInRes
 
 export async function undoCheckIn(habitId: string, date: string): Promise<UndoCheckInResponse> {
   return apiClient.delete<UndoCheckInResponse>(`/habits/${habitId}/checkins/${date}`);
+}
+
+export async function getHabitLogs(habitId: string, month: string): Promise<HabitLogsResponse> {
+  return apiClient.get<HabitLogsResponse>(`/habits/${habitId}/logs?month=${month}`);
+}
+
+export async function getHabitStats(habitId: string): Promise<HabitStatsResponse> {
+  return apiClient.get<HabitStatsResponse>(`/habits/${habitId}/stats`);
 }

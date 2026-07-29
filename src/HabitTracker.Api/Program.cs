@@ -124,4 +124,7 @@ apiV1.MapMeEndpoints();
 apiV1.MapGroup("/habits")
     .MapHabitsEndpoints();
 
+apiV1.MapGroup("/stats")
+    .MapStatsEndpoints();
+
 app.Run();

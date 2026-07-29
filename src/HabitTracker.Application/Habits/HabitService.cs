@@ -203,6 +203,50 @@ public class HabitService(IHabitRepository habitRepository)
         return new UndoCheckInResponse(streaks.CurrentStreak, streaks.BestStreak);
     }
 
+    public async Task<HabitLogsResponse> GetLogsAsync(
+        Guid userId,
+        Guid habitId,
+        int year,
+        int month,
+        CancellationToken cancellationToken = default)
+    {
+        var habit = await habitRepository.GetByIdForUserAsync(habitId, userId, cancellationToken);
+
+        if (habit is null)
+            throw new NotFoundException(HabitNotFoundMessage);
+
+        var completedDates = await LoadCompletedDatesForHabitAsync(habitId, cancellationToken);
+
+        return HabitStatsCalculator.CalculateLogs(habit, completedDates, year, month);
+    }
+
+    public async Task<HabitStatsResponse> GetStatsAsync(
+        Guid userId,
+        Guid habitId,
+        CancellationToken cancellationToken = default)
+    {
+        var habit = await habitRepository.GetByIdForUserAsync(habitId, userId, cancellationToken);
+
+        if (habit is null)
+            throw new NotFoundException(HabitNotFoundMessage);
+
+        var completedDates = await LoadCompletedDatesForHabitAsync(habitId, cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        return HabitStatsCalculator.CalculateHabitStats(habit, completedDates, today);
+    }
+
+    public async Task<StatsSummaryResponse> GetSummaryAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var habits = await habitRepository.ListByUserAsync(userId, includeArchived: false, cancellationToken);
+        var completedByHabit = await LoadCompletedDatesAsync(habits, cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        return HabitStatsCalculator.CalculateSummary(habits, completedByHabit, today);
+    }
+
     private async Task<StreakResult> CalculateStreaksAsync(
         Habit habit,
         DateOnly today,
@@ -243,6 +287,14 @@ public class HabitService(IHabitRepository habitRepository)
                 new ValidationFailure("Date", "Check-in date must be within one day of the server date.")
             ]);
         }
+    }
+
+    private async Task<HashSet<DateOnly>> LoadCompletedDatesForHabitAsync(
+        Guid habitId,
+        CancellationToken cancellationToken)
+    {
+        var rows = await habitRepository.GetCompletedDatesByHabitIdsAsync([habitId], cancellationToken);
+        return rows.Select(row => row.Date).ToHashSet();
     }
 
     private async Task<IReadOnlyDictionary<Guid, HashSet<DateOnly>>> LoadCompletedDatesAsync(
